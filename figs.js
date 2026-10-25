@@ -51,6 +51,8 @@ function drawPose(p,tint,opt={}){const J=solve(p);const g=el('g',{});const T=k=>
 function extras(g,J,list){for(const x of list||[]){
  if(x.floor!==false&&x.t==='wall')g.append(el('rect',{x:x.x,y:x.y??0,width:6,height:146-(x.y??0),fill:'#c9d2cc'}));
  if(x.t==='mat'){g.append(el('rect',{x:20,y:40,width:170,height:106,rx:8,fill:'#eef3ef',stroke:'#c9d2cc'}));g.append(el('text',{x:26,y:54,'font-size':9,fill:'#7a8a80'},'床（上から）'))}
+ if(x.t==='band')g.append(el('path',{d:`M${x.at[0]} ${x.at[1]} L${J.W[0]} ${J.W[1]}`,stroke:'#3a6ea5','stroke-width':2.5,fill:'none'}));
+ if(x.t==='box')g.append(el('rect',{x:x.x,y:x.y,width:x.w,height:146-x.y,rx:3,fill:'#c9b79c',stroke:'#8a7556'}));
  if(x.t==='tube')g.append(el('path',{d:`M${J.T[0]} ${J.T[1]} L${J.W[0]} ${J.W[1]}`,stroke:'#3a6ea5','stroke-width':2.5,fill:'none'}));
  if(x.t==='db')g.append(el('rect',{x:J.W[0]-8,y:J.W[1]-3,width:16,height:7,rx:2,fill:'#555'}));
  if(x.t==='towel'){g.append(el('ellipse',{cx:J.K[0],cy:J.K[1]+9,rx:9,ry:4.5,fill:'#9ec5e8',stroke:'#3a6ea5'}))}

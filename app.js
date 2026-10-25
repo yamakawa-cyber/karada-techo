@@ -20,7 +20,7 @@ const DBN='karada',KEY=DEMO?'demo':'state';let db;
 function idb(){return new Promise((ok,ng)=>{const r=indexedDB.open(DBN,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ng(r.error)})}
 function idbGet(k){return new Promise((ok,ng)=>{const t=db.transaction('kv').objectStore('kv').get(k);t.onsuccess=()=>ok(t.result);t.onerror=()=>ng(t.error)})}
 function idbPut(k,v){return new Promise((ok,ng)=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>ok();tx.onerror=()=>ng(tx.error);tx.onabort=()=>ng(tx.error)})}
-function fresh(){return{version:1,settings:{weightKg:75,waistCm:85,provisional:true,heightCm:null,equip:{tube:false,dumbbell:false,mat:true},week:{1:'A',2:'run',3:'M',4:'B',5:'M',6:'run',0:'rest'},remindOn:false,remindTime:'20:00'},block:{start:monday(today()),no:1},prog:{},variant:{},logs:[],body:[],pain:{date:'',areas:[]},courses:[]}}
+function fresh(){return{version:1,settings:{weightKg:75,waistCm:85,provisional:true,heightCm:null,equip:{tube:false,dumbbell:false,mat:true},week:{1:'A',2:'run',3:'M',4:'B',5:'M',6:'run',0:'rest'},remindOn:false,remindTime:'20:00',hardOn:false},block:{start:monday(today()),no:1},prog:{},variant:{},logs:[],body:[],pain:{date:'',areas:[]},courses:[]}}
 let S=fresh();
 async function save(){try{await idbPut(KEY,S)}catch(e){alert('保存に失敗しました：'+e.message)}}
 const LIMIT=4*1024*1024;
@@ -39,7 +39,8 @@ function validate(o){
  if(st.provisional!=null){if(typeof st.provisional!=='boolean')E('仮フラグが不正');n.settings.provisional=st.provisional}
  if(st.heightCm!=null){if(!isNum(st.heightCm,80,250))E('身長が範囲外');n.settings.heightCm=st.heightCm}
  if(st.equip){for(const k of['tube','dumbbell','mat']){if(st.equip[k]!=null){if(typeof st.equip[k]!=='boolean')E('器具設定が不正');n.settings.equip[k]=st.equip[k]}}}
- if(st.week){for(let i=0;i<7;i++){const v=st.week[i];if(v!=null){if(!['A','B','M','Q','run','rest'].includes(v))E('週の予定が不正');n.settings.week[i]=v}}}
+ if(st.week){for(let i=0;i<7;i++){const v=st.week[i];if(v!=null){if(!['A','B','M','Q','H','N','run','rest'].includes(v))E('週の予定が不正');n.settings.week[i]=v}}}
+ if(st.hardOn!=null){if(typeof st.hardOn!=='boolean')E('きつめ設定が不正');n.settings.hardOn=st.hardOn}
  if(st.remindOn!=null){if(typeof st.remindOn!=='boolean')E('通知設定が不正');n.settings.remindOn=st.remindOn}
  if(st.remindTime!=null){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(st.remindTime))E('通知時刻が不正');n.settings.remindTime=st.remindTime}
  if(d.block){if(!validDate(d.block.start)||!isNum(d.block.no,1,999)||!Number.isInteger(d.block.no))E('ブロック情報が不正');n.block={start:d.block.start,no:d.block.no}}
@@ -71,14 +72,14 @@ function blockWeek(d){const w=Math.floor(diffDays(S.block.start,d)/7);return w<0
 const MULT=[1,1.1,1.2,0.7];const WEEKNAME=['1週目：土台','2週目：少し増やす','3週目：いちばん頑張る週','4週目：回復週（軽め）'];
 function target(exId,d){const e=EXM[exId];const p=S.prog[exId]||0;const w=blockWeek(d)%4;return Math.max(1,Math.round((e.base+e.step*p)*MULT[w]))}
 function painToday(){return S.pain.date===today()?S.pain.areas:[]}
-function allowed(e){if(e.equip&&!S.settings.equip[e.equip])return false;return!e.load.some(a=>painToday().includes(a))}
+function allowed(e){if(e.hard&&!S.settings.hardOn)return false;if(e.equip&&!S.settings.equip[e.equip])return false;return!e.load.some(a=>painToday().includes(a))}
 const WARM=['armcircle','catcow'],COOL=['hamstretch','kneerock'];const LIMIT_MIN=30,REST=20;
 function sessionItems(key){return SESSIONS[key].items.map(id=>EXM[id]).filter(allowed)}
 function exSec(e,d){return e.unit==='sec'?target(e.id,d):target(e.id,d)*3}
-function warmCool(key){if(key==='Q')return{w:[],c:[]};const f=a=>a.map(id=>EXM[id]).filter(allowed);return{w:f(WARM),c:f(COOL).filter(e=>!SESSIONS[key].items.includes(e.id))}}
+function warmCool(key){if(key==='Q'||key==='N')return{w:[],c:[]};const f=a=>a.map(id=>EXM[id]).filter(allowed);return{w:f(WARM),c:f(COOL).filter(e=>!SESSIONS[key].items.includes(e.id))}}
 function plan30(key,d){d=d||today();const it=sessionItems(key);const{w,c}=warmCool(key);const ws=w.reduce((t,e)=>t+e.base*(e.unit==='sec'?1:3)+10,0),cs=c.reduce((t,e)=>t+e.base*(e.unit==='sec'?1:3)+10,0);
- let sets=SESSIONS[key].sets;const one=it.reduce((t,e)=>t+exSec(e,d)+REST,0);while(sets>1&&ws+cs+one*sets>LIMIT_MIN*60)sets--;
- let items=it.slice();while(items.length>1&&ws+cs+items.reduce((t,e)=>t+exSec(e,d)+REST,0)*sets>LIMIT_MIN*60)items.pop();
+ let sets=SESSIONS[key].sets;const one=it.reduce((t,e)=>t+exSec(e,d)+REST,0);const LIM=(SESSIONS[key].limit||LIMIT_MIN)*60;while(sets>1&&ws+cs+one*sets>LIM)sets--;
+ let items=it.slice();while(items.length>1&&ws+cs+items.reduce((t,e)=>t+exSec(e,d)+REST,0)*sets>LIM)items.pop();
  const main=items.reduce((t,e)=>t+exSec(e,d)+REST,0)*sets;return{items,sets,w,c,wMin:Math.ceil(ws/60),mMin:Math.ceil(main/60),cMin:Math.ceil(cs/60),total:Math.ceil((ws+cs+main)/60)}}
 function hasBody(){return S.body.some(x=>x.weightKg)}
 function curWeight(){const b=[...S.body].filter(x=>x.weightKg).sort((a,b)=>a.date<b.date?-1:1);return b.length?b[b.length-1].weightKg:S.settings.weightKg}
@@ -111,6 +112,7 @@ function vHome(el){const d=today();const wd=dOf(d).getDay();const key=S.settings
  const c=h('div',{class:'card main'});
  if(key==='rest'){c.append(h('h2',null,'今日はお休みの日'),h('p',null,'しっかり休むのも体づくりの一部です。動きたければ「すきま5分ケア」もどうぞ。'),h('a',{class:'btn ghost',href:'#go/Q'},'すきま5分ケア'))}
  else if(key==='run'){c.append(h('h2',null,'今日はラン・ウォークの日'),h('p',null,'目安は20〜30分（最初の5分は歩いて準備、最後に歩いて整理）。歩きまじりでも立派な有酸素運動です。'),h('a',{class:'btn',href:'#run'},'ランを始める'))}
+ else if(SESSIONS[key].hard&&!S.settings.hardOn){c.append(h('h2',null,SESSIONS[key].name),h('p',null,'きつめメニューがOFFなので、今日は「ほぐし」にしときましょう。'),h('a',{class:'btn',href:'#go/M'},'ほぐし10分'))}
  else{const P=plan30(key,d);const it=P.items;c.append(h('h2',null,SESSIONS[key].name),h('p',{class:'sub'},'約'+P.total+'分（準備'+P.wMin+'分＋本番'+P.mMin+'分＋整理'+P.cMin+'分）・'+it.length+'種目×'+P.sets+'セット'),h('ul',{class:'list'},it.map(e=>h('li',null,e.name+'　'+target(e.id,d)+(e.unit==='sec'?'秒':'回')))),didSession(d,key)?h('p',{class:'ok'},'✓ 今日のぶんは完了！おつかれさま。'):h('a',{class:'btn',href:'#go/'+key},'はじめる'))}
  el.append(c);
  // 今週まだのもの（やさしい振替）
@@ -118,7 +120,7 @@ function vHome(el){const d=today();const wd=dOf(d).getDay();const key=S.settings
  const leftK=left.filter(k=>k!==key&&!thisWeekDone(k));
  if(leftK.length)el.append(h('div',{class:'card soft'},h('h2',null,'今週、気が向いたら'),h('p',{class:'sub'},'できなかった日の分は、ここに回しておきました。やらなくても大丈夫。'),leftK.map(k=>h('a',{class:'btn ghost',href:k==='run'?'#run':'#go/'+k},k==='run'?'ラン・ウォーク':SESSIONS[k].name))));
  el.append(h('div',{class:'card soft'},h('p',{class:'sub'},'今週の実施：'+weekCount(d)+'回 / 今日の消費 約'+Math.round(doneOn(d).reduce((s,l)=>s+l.kcal,0))+'kcal')));
- el.append(h('div',{class:'row'},h('a',{class:'btn ghost',href:'#go/Q'},'すきま5分'),h('a',{class:'btn ghost',href:'#go/M'},'ほぐし10分')));
+ el.append(h('div',{class:'row'},h('a',{class:'btn ghost',href:'#go/Q'},'すきま5分'),h('a',{class:'btn ghost',href:'#go/N'},'あご・首5分')),h('div',{class:'row'},h('a',{class:'btn ghost',href:'#go/M'},'ほぐし10分'),S.settings.hardOn?h('a',{class:'btn ghost',href:'#go/H'},'HIIT 約15分'):null));
  if(!hasBody())el.prepend(h('div',{class:'card soft'},h('p',null,'体重 '+S.settings.weightKg+'kg・腹囲 '+S.settings.waistCm+'cm は「仮」の値です。測れたら記録してな、カロリー計算が正確になるで。'),h('a',{class:'btn ghost',href:'#body'},'体重・腹囲を測って記録')));
  remindBanner(el)}
 function thisWeekDone(k){const d=today();const mon=monday(d);for(let i=0;i<=diffDays(mon,d);i++)if(didSession(addDays(mon,i),k))return true;return false}
@@ -130,6 +132,7 @@ let wake=null;
 async function lockOn(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){}}
 function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator();o.frequency.value=880;o.connect(a.destination);o.start();o.stop(a.currentTime+.15)}catch(e){}navigator.vibrate?.(200)}
 function vGo(el,v){const key=v.split('/')[1];if(!SESSIONS[key]){location.hash='#home';return}
+ if(SESSIONS[key].hard&&!S.settings.hardOn){el.append(h('h1',null,SESSIONS[key].name),coach('worried','これはきつめのメニューやで。設定の「きつめメニューを入れる」をONにしてからな。'),h('a',{class:'btn',href:'#settings'},'設定をひらく'),h('a',{class:'btn ghost',href:'#home'},'戻る'));return}
  const P=plan30(key);const items=P.items;if(!items.length){el.append(h('p',null,'今日の痛みの設定で、できる種目がありません。今日は休みましょう。'),h('a',{class:'btn',href:'#home'},'戻る'));return}
  const seq=[];for(const e of P.w)seq.push({e,set:0,ph:'準備',fixed:e.base});for(let s=0;s<P.sets;s++)for(const e of items)seq.push({e,set:s+1});for(const e of P.c)seq.push({e,set:0,ph:'整理',fixed:e.base});
  const R={i:0,done:{},sec:{},start:Date.now(),rest:0,paused:false};lockOn();
@@ -138,7 +141,7 @@ function vGo(el,v){const key=v.split('/')[1];if(!SESSIONS[key]){location.hash='#
  function show(){clearInterval(timer);box.replaceChildren();
   if(R.i>=seq.length)return finish(false);
   const{e,set,ph,fixed}=seq[R.i];const tg=fixed||target(e.id,today());const vi=S.variant[e.id]||0;
-  box.append(h('p',{class:'sub'},(R.i+1)+' / '+seq.length+'　'+(ph?ph+'運動':set+'セット目')),h('h1',null,e.name),h('p',{class:'lv'},'レベル：'+e.levels[vi]),formBox(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')));
+  box.append(h('p',{class:'sub'},(R.i+1)+' / '+seq.length+'　'+(ph?ph+'運動':set+'セット目')),h('h1',null,e.name,e.hard?h('span',{class:'hard'},'つよめ'):null),h('p',{class:'lv'},'レベル：'+e.levels[vi]),formBox(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')));
   if(e.unit==='sec'){let left=tg;const big=h('div',{class:'big'},left+'秒');const pb=h('button',{class:'btn ghost',onclick:()=>{R.paused=!R.paused;pb.textContent=R.paused?'再開':'一時停止'}},'一時停止');
    box.append(big,h('div',{class:'row'},pb,h('button',{class:'btn ghost',onclick:()=>{rec(e,tg-left);next()}},'次へ'),stopBtn()));R.paused=false;
    timer=setInterval(()=>{if(R.paused)return;left--;big.textContent=left+'秒';if(left<=0){beep();rec(e,tg);next()}},1000)}
@@ -147,7 +150,7 @@ function vGo(el,v){const key=v.split('/')[1];if(!SESSIONS[key]){location.hash='#
  function next(){clearInterval(timer);R.i++;if(R.i>=seq.length)return finish(false);let r=20;box.replaceChildren(h('h1',null,'休憩'),h('div',{class:'big'},r+'秒'),h('p',{class:'sub'},'次：'+seq[R.i].e.name),h('button',{class:'btn ghost',onclick:show},'休憩をとばす'));const big=box.querySelector('.big');timer=setInterval(()=>{r--;big.textContent=r+'秒';if(r<=0){beep();show()}},1000)}
  function finish(stopped){clearInterval(timer);wake?.release?.();const dur=Math.round((Date.now()-R.start)/1000);box.replaceChildren();
   const its=Object.entries(R.done).map(([ex,done])=>({ex,done:Math.round(done),variant:S.variant[ex]||0}));
-  const met=its.length?its.reduce((s,i)=>s+MET[EXM[i.ex].cat],0)/its.length:3;const k=Math.round(kcal(met,curWeight(),dur));
+  const met=its.length?its.reduce((s,i)=>s+(EXM[i.ex].met||MET[EXM[i.ex].cat]),0)/its.length:3;const k=Math.round(kcal(met,curWeight(),dur));
   box.append(h('h1',null,stopped?'ここまでおつかれさま':'完了！おつかれさま'),h('p',null,fmtT(dur)+'・約'+k+'kcal'),h('h2',null,'きつさは？'));let rpe=3;
   const rs=h('div',{class:'chips'});['1 楽','2 やや楽','3 ちょうど','4 きつい','5 限界'].forEach((t,i)=>rs.append(h('button',{class:'chip'+(i===2?' on':''),onclick:ev=>{rpe=i+1;rs.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));ev.target.classList.add('on')}},t)));
   const note=h('textarea',{maxlength:'500',placeholder:'メモ（任意・体調など）'});
@@ -171,7 +174,7 @@ function vPlan(el){const d=today();const w=blockWeek(d);
  if(w>=4){el.append(h('div',{class:'card main'},h('h2',null,'ブロック'+S.block.no+' 完了！'),h('p',null,'4週間おつかれさまでした。実施した種目の目標を上げて、次のブロックへ進みましょう。'),h('button',{class:'btn',onclick:async()=>{const up=levelUp();S.block={start:monday(d),no:S.block.no+1};await save();alert(up.length?'レベルアップ：'+up.join('、'):'次のブロックを始めます');render()}},'次のブロックへ')))}
  const mon=monday(d);const t=h('div',{class:'card'},h('h2',null,'今週の予定'));
  for(let i=0;i<7;i++){const dd=addDays(mon,i);const wd=dOf(dd).getDay();const k=S.settings.week[wd];const done=k!=='rest'&&didSession(dd,k);
-  const sel=h('select',{'aria-label':WD[wd]+'曜の予定',onchange:async ev=>{S.settings.week[wd]=ev.target.value;await save();render()}},[['A',SESSIONS.A.name],['B',SESSIONS.B.name],['M',SESSIONS.M.name],['Q',SESSIONS.Q.name],['run','ラン・ウォーク'],['rest','休み']].map(([v,n])=>h('option',{value:v,selected:v===k},n)));
+  const sel=h('select',{'aria-label':WD[wd]+'曜の予定',onchange:async ev=>{S.settings.week[wd]=ev.target.value;await save();render()}},[['A',SESSIONS.A.name],['B',SESSIONS.B.name],['M',SESSIONS.M.name],['Q',SESSIONS.Q.name],['N',SESSIONS.N.name],['H',SESSIONS.H.name+(S.settings.hardOn?'':'（OFF中）')],['run','ラン・ウォーク'],['rest','休み']].map(([v,n])=>h('option',{value:v,selected:v===k},n)));
   t.append(h('div',{class:'day'+(dd===d?' today':'')},h('span',{class:'dn'},WD[wd]+' '+dd.slice(8)),sel,h('span',{class:'st'},done?'✓':(dd<d&&k!=='rest'?'→振替':''))))}
  el.append(t,h('p',{class:'sub'},'「→振替」はできなかった日。今日の画面の「気が向いたら」に回ります。休んでもペナルティはありません。'))}
 function levelUp(){const up=[];const st=S.block.start;const cnt={};for(const l of S.logs)if(l.date>=st&&l.type==='session')for(const i of l.items){cnt[i.ex]=(cnt[i.ex]||0)+1}
@@ -255,7 +258,7 @@ function runList(el){const L2=S.logs.filter(l=>l.type!=='session').sort((a,b)=>a
 function vMore(el){el.append(h('h1',null,'その他'),h('div',{class:'menu'},[['#menu','種目一覧（レベル変更）'],['#body','体重・腹囲を記録'],['#settings','設定・バックアップ'],['#safety','安全のために（必ずお読みください）']].map(([a,n])=>h('a',{class:'btn ghost',href:a},n))))}
 function vMenu(el){el.append(h('h1',null,'種目一覧'),h('p',{class:'sub'},'器具の設定でOFFの種目、今日痛い部位に負担がかかる種目は灰色です。'));
  for(const[c,n]of Object.entries(CATS)){el.append(h('h2',null,n));for(const e of EX.filter(x=>x.cat===c)){const vi=S.variant[e.id]||0;const sel=h('select',{'aria-label':e.name+'のレベル',onchange:async ev=>{S.variant[e.id]=+ev.target.value;await save()}},e.levels.map((l,i)=>h('option',{value:i,selected:i===vi},'Lv'+(i+1)+' '+l)));
-  el.append(h('details',{class:'card ex'+(allowed(e)?'':' off')},h('summary',null,e.name+'　',h('span',{class:'sub'},e.target)),formBox(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),h('p',{class:'sub'},'負担がかかる部位：'+(e.load.map(a=>AREAS[a]).join('・')||'少ない')+(e.equip?'　器具：'+{tube:'チューブ',dumbbell:'ダンベル'}[e.equip]:'')),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')),h('label',null,'レベル',sel)))}}}
+  el.append(h('details',{class:'card ex'+(allowed(e)?'':' off')},h('summary',null,e.name+'　',e.hard?h('span',{class:'hard'},'つよめ'):null,h('span',{class:'sub'},e.target)),formBox(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),h('p',{class:'sub'},'負担がかかる部位：'+(e.load.map(a=>AREAS[a]).join('・')||'少ない')+(e.equip?'　器具：'+{tube:'チューブ',dumbbell:'ダンベル'}[e.equip]:'')),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')),h('label',null,'レベル',sel)))}}}
 function vSafety(el){el.append(h('h1',null,'安全のために'),h('div',{class:'card'},...[
  'このアプリは運動の記録と参考情報のためのもので、医療行為・診断・治療ではありません。','痛み・しびれ・めまい・息苦しさ・胸の痛みが出たら、すぐに中止してください。','痛みが続く・強くなる・しびれがある時は、整形外科などの医療機関に相談してください。','持病がある方、服薬中の方は、始める前に医師に相談してください。','強度は「少し物足りない」くらいから。反動をつけず、呼吸を止めないで行いましょう。','消費カロリーは身体活動のメッツ表（Compendium of Physical Activities／国立健康・栄養研究所）を使った目安です。'].map(t=>h('p',null,t))))}
 function vSettings(el){const st=S.settings;el.append(h('h1',null,'設定'));
@@ -263,6 +266,7 @@ function vSettings(el){const st=S.settings;el.append(h('h1',null,'設定'));
  el.append(h('div',{class:'card'},h('h2',null,'体重（カロリー計算用）'+(hasBody()?'':'【仮】')),h('p',{class:'sub'},'体重の記録があれば最新の記録を使います。まだ記録がないので仮の値（75kg・腹囲85cm）を使っています。'),w));
  const eq=h('div',{class:'card'},h('h2',null,'使える器具'),h('p',{class:'sub'},'基本は自重のみ。持っている器具をONにすると種目が増えます。'));
  [['tube','チューブ'],['dumbbell','ダンベル'],['mat','マット']].forEach(([k,n])=>eq.append(h('label',{class:'tg'},h('input',{type:'checkbox',checked:st.equip[k],onchange:async ev=>{st.equip[k]=ev.target.checked;await save()}}),n)));el.append(eq);
+ el.append(h('div',{class:'card'},h('h2',null,'きつめメニュー'),h('label',{class:'tg'},h('input',{type:'checkbox',checked:st.hardOn,onchange:async ev=>{st.hardOn=ev.target.checked;await save()}}),'きつめメニューを入れる'),h('p',{class:'sub'},'ONにすると、マウンテンクライマー・バーピー・Vアップなど「つよめ」の種目と「しっかりHIIT（約15分）」が使えます。体調の悪い日・痛みのある日はOFFのままで。')));
  const rt=h('input',{type:'time',value:st.remindTime});rt.onchange=async()=>{if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(rt.value))return;st.remindTime=rt.value;await save()};
  el.append(h('div',{class:'card'},h('h2',null,'お知らせ'),h('label',{class:'tg'},h('input',{type:'checkbox',checked:st.remindOn,onchange:async ev=>{st.remindOn=ev.target.checked;if(st.remindOn&&'Notification'in window&&Notification.permission==='default')await Notification.requestPermission();await save()}}),'毎日お知らせする'),h('label',null,'時刻',rt),
   h('p',{class:'sub'},'正直な注意：ホーム画面のアプリ（PWA）は、閉じている間に決まった時刻で通知を出す仕組みがAndroidでもまだ使えません。このアプリを開いた時に「今日まだ」の案内と通知を出します。確実に毎日知らせたい場合は、スマホの時計アプリのアラームを併用してください。')));
