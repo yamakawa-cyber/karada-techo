@@ -1,5 +1,6 @@
 'use strict';
 /* からだ手帳 v1 — 端末内(IndexedDB)のみ保存。外部送信は地図タイルのみ。 */
+{const _a=Element.prototype.append,_p=Element.prototype.prepend;Element.prototype.append=function(...k){return _a.apply(this,k.filter(x=>x!=null&&x!==false))};Element.prototype.prepend=function(...k){return _p.apply(this,k.filter(x=>x!=null&&x!==false))}}
 const $=s=>document.querySelector(s);
 function h(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const[k,v]of Object.entries(attrs)){if(v==null||v===false)continue;if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(k==='class')e.className=v;else e.setAttribute(k,v===true?'':v)}for(const c of kids.flat()){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(String(c)))}return e}
 const Q=new URLSearchParams(location.search);const DEMO=Q.get('demo')==='1';
