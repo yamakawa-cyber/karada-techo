@@ -138,7 +138,7 @@ function vGo(el,v){const key=v.split('/')[1];if(!SESSIONS[key]){location.hash='#
  function show(){clearInterval(timer);box.replaceChildren();
   if(R.i>=seq.length)return finish(false);
   const{e,set,ph,fixed}=seq[R.i];const tg=fixed||target(e.id,today());const vi=S.variant[e.id]||0;
-  box.append(h('p',{class:'sub'},(R.i+1)+' / '+seq.length+'　'+(ph?ph+'運動':set+'セット目')),h('h1',null,e.name),h('p',{class:'lv'},'レベル：'+e.levels[vi]),fig(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')));
+  box.append(h('p',{class:'sub'},(R.i+1)+' / '+seq.length+'　'+(ph?ph+'運動':set+'セット目')),h('h1',null,e.name),h('p',{class:'lv'},'レベル：'+e.levels[vi]),formBox(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')));
   if(e.unit==='sec'){let left=tg;const big=h('div',{class:'big'},left+'秒');const pb=h('button',{class:'btn ghost',onclick:()=>{R.paused=!R.paused;pb.textContent=R.paused?'再開':'一時停止'}},'一時停止');
    box.append(big,h('div',{class:'row'},pb,h('button',{class:'btn ghost',onclick:()=>{rec(e,tg-left);next()}},'次へ'),stopBtn()));R.paused=false;
    timer=setInterval(()=>{if(R.paused)return;left--;big.textContent=left+'秒';if(left<=0){beep();rec(e,tg);next()}},1000)}
@@ -154,6 +154,9 @@ function vGo(el,v){const key=v.split('/')[1];if(!SESSIONS[key]){location.hash='#
   box.append(rs,note,h('button',{class:'btn',onclick:async()=>{if(!its.length&&!confirm('記録する種目がありません。記録しますか？'))return;const prs=newPRs(its);S.logs.push({id:uid(),date:today(),type:'session',session:key,durSec:dur,kcal:k,items:its,rpe,note:note.value.slice(0,500)});await save();
    box.replaceChildren(h('img',{src:prs.length?'img/mamie_chibi.webp':'img/mamie_happy.webp',alt:'メイミー',class:'hero'}),h('h1',null,'記録しました'),prs.length?coach('proud',pick(LINES.pr,Date.now()%7)):rpe>=4?coach('worried',LINES.hard[0]):coach('happy',pick(LINES.done,Date.now()%7)),prs.length?h('p',{class:'ok'},'自己ベスト更新：'+prs.join('、')):null,h('a',{class:'btn',href:'#home'},'今日へ戻る'))}},'記録する'))}
  show()}
+function formBox(e){const f=formFigure(e.id);f.classList.add('tap');f.setAttribute('role','button');f.setAttribute('tabindex','0');f.setAttribute('aria-label',e.name+'のフォーム図を拡大');
+ const open=()=>{const ov=h('div',{class:'zoom',role:'dialog','aria-label':e.name+'のフォーム図'},h('h2',null,e.name),formFigure(e.id),h('button',{class:'btn',onclick:()=>ov.remove()},'閉じる'));ov.addEventListener('click',ev=>{if(ev.target===ov)ov.remove()});document.body.append(ov)};
+ f.addEventListener('click',open);f.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();open()}});return h('div',null,f,h('p',{class:'sub small'},'図をタップで拡大'))}
 function newPRs(its){const r=[];for(const i of its){const prev=S.logs.flatMap(l=>l.items||[]).filter(x=>x.ex===i.ex&&(x.variant||0)===i.variant).reduce((m,x)=>Math.max(m,x.done),0);if(prev>0&&i.done>prev)r.push(EXM[i.ex].name+' '+i.done+(EXM[i.ex].unit==='sec'?'秒':'回'))}return r}
 // 図（外部素材なし：SVGの棒人間）
 function fig(e){const ns='http://www.w3.org/2000/svg';const s=document.createElementNS(ns,'svg');s.setAttribute('viewBox','0 0 120 70');s.setAttribute('class','fig');s.setAttribute('aria-hidden','true');
@@ -252,7 +255,7 @@ function runList(el){const L2=S.logs.filter(l=>l.type!=='session').sort((a,b)=>a
 function vMore(el){el.append(h('h1',null,'その他'),h('div',{class:'menu'},[['#menu','種目一覧（レベル変更）'],['#body','体重・腹囲を記録'],['#settings','設定・バックアップ'],['#safety','安全のために（必ずお読みください）']].map(([a,n])=>h('a',{class:'btn ghost',href:a},n))))}
 function vMenu(el){el.append(h('h1',null,'種目一覧'),h('p',{class:'sub'},'器具の設定でOFFの種目、今日痛い部位に負担がかかる種目は灰色です。'));
  for(const[c,n]of Object.entries(CATS)){el.append(h('h2',null,n));for(const e of EX.filter(x=>x.cat===c)){const vi=S.variant[e.id]||0;const sel=h('select',{'aria-label':e.name+'のレベル',onchange:async ev=>{S.variant[e.id]=+ev.target.value;await save()}},e.levels.map((l,i)=>h('option',{value:i,selected:i===vi},'Lv'+(i+1)+' '+l)));
-  el.append(h('details',{class:'card ex'+(allowed(e)?'':' off')},h('summary',null,e.name+'　',h('span',{class:'sub'},e.target)),fig(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),h('p',{class:'sub'},'負担がかかる部位：'+(e.load.map(a=>AREAS[a]).join('・')||'少ない')+(e.equip?'　器具：'+{tube:'チューブ',dumbbell:'ダンベル'}[e.equip]:'')),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')),h('label',null,'レベル',sel)))}}}
+  el.append(h('details',{class:'card ex'+(allowed(e)?'':' off')},h('summary',null,e.name+'　',h('span',{class:'sub'},e.target)),formBox(e),h('ol',{class:'steps'},e.steps.map(s=>h('li',null,s))),h('p',{class:'sub'},'負担がかかる部位：'+(e.load.map(a=>AREAS[a]).join('・')||'少ない')+(e.equip?'　器具：'+{tube:'チューブ',dumbbell:'ダンベル'}[e.equip]:'')),e.cautions.length?h('p',{class:'sub'},'注意：'+e.cautions.join('・')):null,h('p',{class:'warn small'},'やめる合図：'+e.stop.join('・')),h('label',null,'レベル',sel)))}}}
 function vSafety(el){el.append(h('h1',null,'安全のために'),h('div',{class:'card'},...[
  'このアプリは運動の記録と参考情報のためのもので、医療行為・診断・治療ではありません。','痛み・しびれ・めまい・息苦しさ・胸の痛みが出たら、すぐに中止してください。','痛みが続く・強くなる・しびれがある時は、整形外科などの医療機関に相談してください。','持病がある方、服薬中の方は、始める前に医師に相談してください。','強度は「少し物足りない」くらいから。反動をつけず、呼吸を止めないで行いましょう。','消費カロリーは身体活動のメッツ表（Compendium of Physical Activities／国立健康・栄養研究所）を使った目安です。'].map(t=>h('p',null,t))))}
 function vSettings(el){const st=S.settings;el.append(h('h1',null,'設定'));
