@@ -94,7 +94,7 @@ let timer=null,runner=null;
 function nav(){const v=(location.hash||'#home').slice(1);render(v)}
 function render(v){v=v||(location.hash||'#home').slice(1);const view=$('#view');view.replaceChildren();if(map&&!v.startsWith('run')){map.remove();map=null}
  const f={home:vHome,plan:vPlan,progress:vProgress,run:vRun,more:vMore,menu:vMenu,body:vBody,settings:vSettings,safety:vSafety,go:vGo}[v.split('/')[0]]||vHome;
- f(view,v);$('#tabs').replaceChildren(...TABS.map(([k,n])=>h('a',{href:'#'+k,class:'tab'+(v.split('/')[0]===k?' on':'')},n)));if(DEMO)view.prepend(h('div',{class:'demo'},'見本モード：見本データです。ここでの変更は保存されず、本番データにも影響しません。'))}
+ f(view,v);if(location.hostname.endsWith('github.io'))view.prepend(h('div',{class:'demo'},'からだ手帳は新しい場所に引っ越しました。インストールはこちらから：',h('a',{href:'https://karada-techo.pages.dev/'},'https://karada-techo.pages.dev/')));$('#tabs').replaceChildren(...TABS.map(([k,n])=>h('a',{href:'#'+k,class:'tab'+(v.split('/')[0]===k?' on':'')},n)));if(DEMO)view.prepend(h('div',{class:'demo'},'見本モード：見本データです。ここでの変更は保存されず、本番データにも影響しません。'))}
 window.addEventListener('hashchange',nav);
 
 /* ---------- 今日 ---------- */
